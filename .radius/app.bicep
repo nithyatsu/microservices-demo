@@ -3,6 +3,9 @@ extension radius
 param environment string
 
 @secure()
+param postgresPassword string
+
+@secure()
 param registryPassword string
 
 @secure()
@@ -15,12 +18,38 @@ resource microservicesDemoApp 'Radius.Core/applications@2025-08-01-preview' = {
   }
 }
 
+resource postgresDb 'Radius.Data/postgreSqlDatabases@2025-08-01-preview' = {
+  name: 'postgres'
+  properties: {
+    environment: environment
+    application: microservicesDemoApp.id
+    codeReference: 'src/orderhistoryservice/store.go#L74'
+    database: 'orderhistory'
+    password: postgresPassword
+    username: 'myadmin'
+  }
+}
+
 resource redisCache 'Radius.Data/redisCaches@2025-08-01-preview' = {
   name: 'redis'
   properties: {
     environment: environment
     application: microservicesDemoApp.id
     codeReference: 'src/cartservice/src/Startup.cs#L36'
+  }
+}
+
+resource postgresClientCredentials 'Radius.Security/secrets@2025-08-01-preview' = {
+  name: 'postgres-client-credentials'
+  properties: {
+    environment: environment
+    application: microservicesDemoApp.id
+    codeReference: 'src/orderhistoryservice/store.go#L58'
+    data: {
+      password: {
+        value: postgresPassword
+      }
+    }
   }
 }
 
@@ -79,9 +108,9 @@ resource checkoutserviceImage 'Radius.Compute/containerImages@2025-08-01-preview
     environment: environment
     application: microservicesDemoApp.id
     codeReference: 'src/checkoutservice/Dockerfile'
-    tag: '38e7348'
+    tag: 'c905e52'
     build: {
-      source: 'git::https://github.com/nithyatsu/microservices-demo.git//src/checkoutservice?ref=38e7348eb289eb5b87c0c6e8cb19ced0449dc389'
+      source: 'git::https://github.com/nithyatsu/microservices-demo.git//src/checkoutservice?ref=c905e52b444542262d9d22e581a6650fc4b8338c'
     }
   }
   dependsOn: [
@@ -133,9 +162,25 @@ resource frontendImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
     environment: environment
     application: microservicesDemoApp.id
     codeReference: 'src/frontend/Dockerfile'
-    tag: '38e7348'
+    tag: 'c905e52'
     build: {
-      source: 'git::https://github.com/nithyatsu/microservices-demo.git//src/frontend?ref=38e7348eb289eb5b87c0c6e8cb19ced0449dc389'
+      source: 'git::https://github.com/nithyatsu/microservices-demo.git//src/frontend?ref=c905e52b444542262d9d22e581a6650fc4b8338c'
+    }
+  }
+  dependsOn: [
+    registryCreds
+  ]
+}
+
+resource orderhistoryserviceImage 'Radius.Compute/containerImages@2025-08-01-preview' = {
+  name: 'orderhistoryservice-image'
+  properties: {
+    environment: environment
+    application: microservicesDemoApp.id
+    codeReference: 'src/orderhistoryservice/Dockerfile'
+    tag: 'c905e52'
+    build: {
+      source: 'git::https://github.com/nithyatsu/microservices-demo.git//src/orderhistoryservice?ref=c905e52b444542262d9d22e581a6650fc4b8338c'
     }
   }
   dependsOn: [
@@ -271,7 +316,12 @@ resource checkoutserviceContainer 'Radius.Compute/containers@2025-08-01-preview'
   properties: {
     environment: environment
     application: microservicesDemoApp.id
-    codeReference: 'src/checkoutservice/main.go#L88'
+    codeReference: 'src/checkoutservice/main.go#L91'
+    connections: {
+      orderhistoryservice: {
+        source: orderhistoryserviceContainer.id
+      }
+    }
     containers: {
       checkoutservice: {
         env: {
@@ -283,6 +333,9 @@ resource checkoutserviceContainer 'Radius.Compute/containers@2025-08-01-preview'
           }
           EMAIL_SERVICE_ADDR: {
             value: '${emailserviceContainer.properties.hosts.emailservice}:8080'
+          }
+          ORDER_HISTORY_SERVICE_ADDR: {
+            value: '${orderhistoryserviceContainer.properties.hosts.orderhistoryservice}:7080'
           }
           PAYMENT_SERVICE_ADDR: {
             value: '${paymentserviceContainer.properties.hosts.paymentservice}:50051'
@@ -367,7 +420,12 @@ resource frontendContainer 'Radius.Compute/containers@2025-08-01-preview' = {
   properties: {
     environment: environment
     application: microservicesDemoApp.id
-    codeReference: 'src/frontend/main.go#L91'
+    codeReference: 'src/frontend/main.go#L94'
+    connections: {
+      orderhistoryservice: {
+        source: orderhistoryserviceContainer.id
+      }
+    }
     containers: {
       frontend: {
         env: {
@@ -385,6 +443,9 @@ resource frontendContainer 'Radius.Compute/containers@2025-08-01-preview' = {
           }
           ENABLE_PROFILER: {
             value: '0'
+          }
+          ORDER_HISTORY_SERVICE_ADDR: {
+            value: '${orderhistoryserviceContainer.properties.hosts.orderhistoryservice}:7080'
           }
           PORT: {
             value: '8080'
@@ -406,6 +467,61 @@ resource frontendContainer 'Radius.Compute/containers@2025-08-01-preview' = {
         ports: {
           web: {
             containerPort: 8080
+          }
+        }
+      }
+    }
+  }
+}
+
+resource orderhistoryserviceContainer 'Radius.Compute/containers@2025-08-01-preview' = {
+  name: 'orderhistoryservice'
+  properties: {
+    environment: environment
+    application: microservicesDemoApp.id
+    codeReference: 'src/orderhistoryservice/main.go#L57'
+    connections: {
+      postgresdb: {
+        source: postgresDb.id
+      }
+      postgressecret: {
+        source: postgresClientCredentials.id
+      }
+    }
+    containers: {
+      orderhistoryservice: {
+        env: {
+          PORT: {
+            value: '7080'
+          }
+          POSTGRES_DB: {
+            value: 'orderhistory'
+          }
+          POSTGRES_HOST: {
+            value: postgresDb.properties.host
+          }
+          POSTGRES_PASSWORD: {
+            valueFrom: {
+              secretKeyRef: {
+                key: 'password'
+                secretName: postgresClientCredentials.name
+              }
+            }
+          }
+          POSTGRES_PORT: {
+            value: '5432'
+          }
+          POSTGRES_SSLMODE: {
+            value: 'require'
+          }
+          POSTGRES_USER: {
+            value: 'myadmin'
+          }
+        }
+        image: orderhistoryserviceImage.properties.imageReference
+        ports: {
+          grpc: {
+            containerPort: 7080
           }
         }
       }
