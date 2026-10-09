@@ -51,3 +51,51 @@
     text-decoration: none;
     color: white;
 }
+
+.order-history-section {
+    max-width: 800px;
+    padding-top: 56px;
+    padding-bottom: 120px;
+}
+
+.order-history-section h3 {
+    margin: 0 0 24px;
+    font-size: 36px;
+    font-weight: normal;
+}
+
+.order-history-section .padding-y-24 {
+    padding-bottom: 24px;
+    padding-top: 24px;
+}
+
+.order-history-card {
+    background: white;
+    border: 1px solid rgba(154, 160, 166, 0.5);
+    border-radius: 8px;
+    margin-bottom: 24px;
+    padding: 16px 24px;
+}
+
+.order-history-header,
+.order-history-item {
+    border-bottom: 1px solid rgba(154, 160, 166, 0.3);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+
+.order-history-label {
+    color: #5f6368;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.order-history-id {
+    font-size: 12px;
+    word-break: break-all;
+}
+
+.order-history-footer {
+    color: #5f6368;
+    font-size: 14px;
+}

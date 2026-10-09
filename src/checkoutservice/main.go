@@ -83,6 +83,9 @@ type checkoutService struct {
 
 	paymentSvcAddr string
 	paymentSvcConn *grpc.ClientConn
+
+	orderHistorySvcAddr string
+	orderHistorySvcConn *grpc.ClientConn
 }
 
 func main() {
@@ -121,6 +124,12 @@ func main() {
 	mustConnGRPC(ctx, &svc.currencySvcConn, svc.currencySvcAddr)
 	mustConnGRPC(ctx, &svc.emailSvcConn, svc.emailSvcAddr)
 	mustConnGRPC(ctx, &svc.paymentSvcConn, svc.paymentSvcAddr)
+
+	// Order history is optional; checkout still works when it isn't configured.
+	svc.orderHistorySvcAddr = os.Getenv("ORDER_HISTORY_SERVICE_ADDR")
+	if svc.orderHistorySvcAddr != "" {
+		mustConnGRPC(ctx, &svc.orderHistorySvcConn, svc.orderHistorySvcAddr)
+	}
 
 	log.Infof("service config: %+v", svc)
 
@@ -275,6 +284,10 @@ func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderReq
 	} else {
 		log.Infof("order confirmation email sent to %q", req.Email)
 	}
+
+	if err := cs.recordOrderHistory(ctx, req.UserId, req.Email, orderResult, &total); err != nil {
+		log.Warnf("failed to record order %q in order history: %+v", orderResult.OrderId, err)
+	}
 	resp := &pb.PlaceOrderResponse{Order: orderResult}
 	return resp, nil
 }
@@ -380,6 +393,18 @@ func (cs *checkoutService) sendOrderConfirmation(ctx context.Context, email stri
 	_, err := pb.NewEmailServiceClient(cs.emailSvcConn).SendOrderConfirmation(ctx, &pb.SendOrderConfirmationRequest{
 		Email: email,
 		Order: order})
+	return err
+}
+
+func (cs *checkoutService) recordOrderHistory(ctx context.Context, userID, email string, order *pb.OrderResult, totalPaid *pb.Money) error {
+	if cs.orderHistorySvcConn == nil {
+		return fmt.Errorf("order history service not configured (ORDER_HISTORY_SERVICE_ADDR unset)")
+	}
+	_, err := pb.NewOrderHistoryServiceClient(cs.orderHistorySvcConn).RecordOrder(ctx, &pb.RecordOrderRequest{
+		UserId:    userID,
+		Email:     email,
+		Order:     order,
+		TotalPaid: totalPaid})
 	return err
 }
 

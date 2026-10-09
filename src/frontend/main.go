@@ -86,6 +86,9 @@ type frontendServer struct {
 	collectorConn *grpc.ClientConn
 
 	shoppingAssistantSvcAddr string
+
+	orderHistorySvcAddr string
+	orderHistorySvcConn *grpc.ClientConn
 }
 
 func main() {
@@ -146,6 +149,12 @@ func main() {
 	mustConnGRPC(ctx, &svc.checkoutSvcConn, svc.checkoutSvcAddr)
 	mustConnGRPC(ctx, &svc.adSvcConn, svc.adSvcAddr)
 
+	// Order history is optional; the /orders page reports when it isn't configured.
+	svc.orderHistorySvcAddr = os.Getenv("ORDER_HISTORY_SERVICE_ADDR")
+	if svc.orderHistorySvcAddr != "" {
+		mustConnGRPC(ctx, &svc.orderHistorySvcConn, svc.orderHistorySvcAddr)
+	}
+
 	r := mux.NewRouter()
 	r.HandleFunc(baseUrl+"/", svc.homeHandler).Methods(http.MethodGet, http.MethodHead)
 	r.HandleFunc(baseUrl+"/product/{id}", svc.productHandler).Methods(http.MethodGet, http.MethodHead)
@@ -155,6 +164,7 @@ func main() {
 	r.HandleFunc(baseUrl+"/setCurrency", svc.setCurrencyHandler).Methods(http.MethodPost)
 	r.HandleFunc(baseUrl+"/logout", svc.logoutHandler).Methods(http.MethodGet)
 	r.HandleFunc(baseUrl+"/cart/checkout", svc.placeOrderHandler).Methods(http.MethodPost)
+	r.HandleFunc(baseUrl+"/orders", svc.orderHistoryHandler).Methods(http.MethodGet, http.MethodHead)
 	r.HandleFunc(baseUrl+"/assistant", svc.assistantHandler).Methods(http.MethodGet)
 	r.PathPrefix(baseUrl + "/static/").Handler(http.StripPrefix(baseUrl+"/static/", http.FileServer(http.Dir("./static/"))))
 	r.HandleFunc(baseUrl+"/robots.txt", func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, "User-agent: *\nDisallow: /") })

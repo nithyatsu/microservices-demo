@@ -1,0 +1,89 @@
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
+{{ define "orders" }}
+
+    {{ template "header" . }}
+
+    <div {{ with $.platform_css }} class="{{.}}" {{ end }}>
+        <span class="platform-flag">
+            {{$.platform_name}}
+        </span>
+    </div>
+
+    <main role="main" class="order">
+        <section class="container order-history-section">
+            <div class="row">
+                <div class="col-12">
+                    <h3>Your orders</h3>
+                </div>
+            </div>
+
+            {{ if not $.orders }}
+            <div class="row padding-y-24">
+                <div class="col-12">
+                    <p>You haven't placed any orders yet.</p>
+                    <a class="cymbal-button-primary" href="{{ $.baseUrl }}/" role="button">
+                        Start Shopping
+                    </a>
+                </div>
+            </div>
+            {{ end }}
+
+            {{ range $.orders }}
+            <div class="order-history-card">
+                <div class="row order-history-header">
+                    <div class="col-md-4">
+                        <div class="order-history-label">Placed</div>
+                        <div>{{ .PlacedAt.Format "Jan 2, 2006 15:04 MST" }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="order-history-label">Total</div>
+                        <div>{{ with .TotalPaid }}{{ renderMoney . }}{{ else }}&mdash;{{ end }}</div>
+                    </div>
+                    <div class="col-md-4 text-md-right">
+                        <div class="order-history-label">Confirmation #</div>
+                        <div class="order-history-id">{{ .OrderID }}</div>
+                    </div>
+                </div>
+                {{ range .Items }}
+                <div class="row order-history-item">
+                    <div class="col-3 col-md-2">
+                        {{ if .Picture }}
+                        <a href="{{ $.baseUrl }}/product/{{ .ProductID }}">
+                            <img class="img-fluid" alt="" src="{{ $.baseUrl }}{{ .Picture }}" />
+                        </a>
+                        {{ end }}
+                    </div>
+                    <div class="col-6 col-md-7">
+                        <a href="{{ $.baseUrl }}/product/{{ .ProductID }}">{{ .Name }}</a>
+                        <div>Quantity: {{ .Quantity }}</div>
+                    </div>
+                    <div class="col-3 text-right">
+                        {{ with .Cost }}{{ renderMoney . }}{{ end }}
+                    </div>
+                </div>
+                {{ end }}
+                <div class="row order-history-footer">
+                    <div class="col-12">Tracking #{{ .ShippingTrackingID }}</div>
+                </div>
+            </div>
+            {{ end }}
+        </section>
+    </main>
+
+    {{ template "footer" . }}
+    {{ end }}
