@@ -108,9 +108,9 @@ resource checkoutserviceImage 'Radius.Compute/containerImages@2025-08-01-preview
     environment: environment
     application: microservicesDemoApp.id
     codeReference: 'src/checkoutservice/Dockerfile'
-    tag: 'c905e52'
+    tag: '1103b48'
     build: {
-      source: 'git::https://github.com/nithyatsu/microservices-demo.git//src/checkoutservice?ref=c905e52b444542262d9d22e581a6650fc4b8338c'
+      source: 'git::https://github.com/nithyatsu/microservices-demo.git//src/checkoutservice?ref=1103b489500feea8841619e8598e3b2175adb7d8'
     }
   }
   dependsOn: [
@@ -316,7 +316,7 @@ resource checkoutserviceContainer 'Radius.Compute/containers@2025-08-01-preview'
   properties: {
     environment: environment
     application: microservicesDemoApp.id
-    codeReference: 'src/checkoutservice/main.go#L91'
+    codeReference: 'src/checkoutservice/main.go#L94'
     connections: {
       orderhistoryservice: {
         source: orderhistoryserviceContainer.id
