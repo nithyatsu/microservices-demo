@@ -45,6 +45,9 @@ import (
 const (
 	listenPort  = "5050"
 	usdCurrency = "USD"
+
+	// Bounds how long a slow order history service can delay checkout.
+	orderHistoryTimeout = 2 * time.Second
 )
 
 var log *logrus.Logger
@@ -400,6 +403,8 @@ func (cs *checkoutService) recordOrderHistory(ctx context.Context, userID, email
 	if cs.orderHistorySvcConn == nil {
 		return fmt.Errorf("order history service not configured (ORDER_HISTORY_SERVICE_ADDR unset)")
 	}
+	ctx, cancel := context.WithTimeout(ctx, orderHistoryTimeout)
+	defer cancel()
 	_, err := pb.NewOrderHistoryServiceClient(cs.orderHistorySvcConn).RecordOrder(ctx, &pb.RecordOrderRequest{
 		UserId:    userID,
 		Email:     email,
