@@ -317,6 +317,79 @@ func (fe *frontendServer) viewCartHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
+func (fe *frontendServer) orderHistoryHandler(w http.ResponseWriter, r *http.Request) {
+	log := r.Context().Value(ctxKeyLog{}).(logrus.FieldLogger)
+	log.Debug("view order history")
+
+	orders, err := fe.getOrderHistory(r.Context(), sessionID(r))
+	if err != nil {
+		renderHTTPError(log, r, w, errors.Wrap(err, "could not retrieve order history"), http.StatusInternalServerError)
+		return
+	}
+	currencies, err := fe.getCurrencies(r.Context())
+	if err != nil {
+		renderHTTPError(log, r, w, errors.Wrap(err, "could not retrieve currencies"), http.StatusInternalServerError)
+		return
+	}
+	cart, err := fe.getCart(r.Context(), sessionID(r))
+	if err != nil {
+		renderHTTPError(log, r, w, errors.Wrap(err, "could not retrieve cart"), http.StatusInternalServerError)
+		return
+	}
+
+	type orderItemView struct {
+		ProductID string
+		Name      string
+		Picture   string
+		Quantity  int32
+		Cost      *pb.Money
+	}
+	type orderView struct {
+		OrderID            string
+		ShippingTrackingID string
+		PlacedAt           time.Time
+		TotalPaid          *pb.Money
+		Items              []orderItemView
+	}
+
+	productCache := map[string]*pb.Product{}
+	views := make([]orderView, 0, len(orders))
+	for _, o := range orders {
+		v := orderView{
+			OrderID:            o.GetOrder().GetOrderId(),
+			ShippingTrackingID: o.GetOrder().GetShippingTrackingId(),
+			PlacedAt:           time.Unix(o.GetPlacedAt(), 0).UTC(),
+			TotalPaid:          o.GetTotalPaid(),
+		}
+		for _, it := range o.GetOrder().GetItems() {
+			id := it.GetItem().GetProductId()
+			iv := orderItemView{ProductID: id, Name: id, Quantity: it.GetItem().GetQuantity(), Cost: it.GetCost()}
+			p, ok := productCache[id]
+			if !ok {
+				// Product details are cosmetic; fall back to the product ID if lookup fails.
+				if p, err = fe.getProduct(r.Context(), id); err != nil {
+					log.WithField("error", err).Warnf("failed to get product %q for order history", id)
+				}
+				productCache[id] = p
+			}
+			if p != nil {
+				iv.Name, iv.Picture = p.GetName(), p.GetPicture()
+			}
+			v.Items = append(v.Items, iv)
+		}
+		views = append(views, v)
+	}
+
+	if err := templates.ExecuteTemplate(w, "orders", injectCommonTemplateData(r, map[string]interface{}{
+		"show_currency": false,
+		"currencies":    currencies,
+		"cart_size":     cartSize(cart),
+		"orders":        views,
+	})); err != nil {
+		log.Println(err)
+	}
+}
+
 func (fe *frontendServer) placeOrderHandler(w http.ResponseWriter, r *http.Request) {
 	log := r.Context().Value(ctxKeyLog{}).(logrus.FieldLogger)
 	log.Debug("placing order")

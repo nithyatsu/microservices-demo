@@ -54,6 +54,15 @@ func (fe *frontendServer) getProduct(ctx context.Context, id string) (*pb.Produc
 	return resp, err
 }
 
+func (fe *frontendServer) getOrderHistory(ctx context.Context, userID string) ([]*pb.HistoricalOrder, error) {
+	if fe.orderHistorySvcConn == nil {
+		return nil, errors.New("order history service not configured (ORDER_HISTORY_SERVICE_ADDR unset)")
+	}
+	resp, err := pb.NewOrderHistoryServiceClient(fe.orderHistorySvcConn).
+		ListOrders(ctx, &pb.ListOrdersRequest{UserId: userID})
+	return resp.GetOrders(), err
+}
+
 func (fe *frontendServer) getCart(ctx context.Context, userID string) ([]*pb.CartItem, error) {
 	resp, err := pb.NewCartServiceClient(fe.cartSvcConn).GetCart(ctx, &pb.GetCartRequest{UserId: userID})
 	return resp.GetItems(), err

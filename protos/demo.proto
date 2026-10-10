@@ -238,6 +238,36 @@ message PlaceOrderResponse {
     OrderResult order = 1;
 }
 
+// ------------Order history service------------------
+
+service OrderHistoryService {
+    rpc RecordOrder(RecordOrderRequest) returns (Empty) {}
+    rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse) {}
+}
+
+message RecordOrderRequest {
+    string user_id = 1;
+    string email = 2;
+    OrderResult order = 3;
+    Money total_paid = 4;
+}
+
+message ListOrdersRequest {
+    string user_id = 1;
+}
+
+message HistoricalOrder {
+    OrderResult order = 1;
+    Money total_paid = 2;
+    string email = 3;
+    // Unix timestamp (seconds) of when the order was placed.
+    int64 placed_at = 4;
+}
+
+message ListOrdersResponse {
+    repeated HistoricalOrder orders = 1;
+}
+
 // ------------Ad service------------------
 
 service AdService {
